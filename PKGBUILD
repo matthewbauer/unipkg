@@ -8,7 +8,7 @@ url="http://bauer.dnsdojo.com/Projects/$pkgdir"
 license=('GPL')
 source=('unipkg')
 depends=('bash')
-md5sums=('4c607dca872ab48e0616def4f20e2986')
+md5sums=('a730da0cdb302ea30eaf740bc16d0ac7')
 
 build() {
 	mkdir -p $pkgdir/usr/bin

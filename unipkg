@@ -1048,9 +1048,9 @@ create_package_deb() {
 	fi
 
 	if [[ $arch = "any" ]]; then
-		PKGARCH="any"
+		PKGARCH="all"
 	else
-		PKGARCH=$CARCH
+		PKGARCH=${DEB_BUILD_ARCH:-$CARCH}
 	fi
 
 	tar cf "data.tar" *
@@ -1121,11 +1121,11 @@ create_package_deb() {
 	# tar it up
 	msg2 "$(gettext "Compressing package...")"
 
-	local files="control.tar.gz data.tar.gz debian-binary"
+	local files="debian-binary control.tar.gz data.tar.gz"
 
 	PKGEXT='.deb'
 
-	local pkg_file="$PKGDEST/${nameofpkg}-${pkgver}-${pkgrel}-${PKGARCH}${PKGEXT}"
+	local pkg_file="$PKGDEST/${nameofpkg}_${pkgver}-${pkgrel}_${PKGARCH}${PKGEXT}"
 
 	local ret=0
 
@@ -1682,9 +1682,20 @@ MAKEPKG_CONF=${MAKEPKG_CONF:-$confdir/makepkg.conf}
 if [[ -r $MAKEPKG_CONF ]]; then
 	source "$MAKEPKG_CONF"
 else
-	error "$(gettext "%s not found.")" "$MAKEPKG_CONF"
-	plain "$(gettext "Aborting...")"
-	exit 1 # $E_CONFIG_ERROR
+    if [ -e "/etc/debian_version" ]
+    then
+        warning "$MAKEPKG_CONF not found, trying to set sane defaults"
+        if [ $(type -p fakeroot) ]
+        then
+            BUILDENV=('fakeroot')
+        fi
+        CARCH=`uname -m`
+        eval `dpkg-architecture`
+    else
+        error "$(gettext "%s not found.")" "$MAKEPKG_CONF"
+        plain "$(gettext "Aborting...")"
+        exit 1 # $E_CONFIG_ERROR
+    fi
 fi
 
 # Source user-specific makepkg.conf overrides
