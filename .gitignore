@@ -1,4 +1,4 @@
 pkg
 src
-*.src.tar.gz
-*.pkg.tar.gz
+*.src.*
+*.pkg.*
