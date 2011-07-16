@@ -14,3 +14,7 @@ build() {
 	mkdir -p $pkgdir/usr/bin
 	cp $srcdir/unipkg $pkgdir/usr/bin
 }
+
+package() {
+	
+}
