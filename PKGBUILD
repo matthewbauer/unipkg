@@ -6,15 +6,19 @@ pkgdesc="Unipkg: a makepkg fork that can also compile to other package formats l
 arch=('any')
 url="http://bauer.dnsdojo.com/Projects/$pkgdir"
 license=('GPL')
-source=('unipkg')
+source=()
 depends=('bash')
 md5sums=('a730da0cdb302ea30eaf740bc16d0ac7')
 
 build() {
-	mkdir -p $pkgdir/usr/bin
-	cp $srcdir/unipkg $pkgdir/usr/bin
+	cd $srcdir/$pkgname-$pkgver
+	./configure --prefix=/usr --sysconfdir=/etc \
+		--localstatedir=/var --enable-doc
+	cd scripts
+	make makepkg
 }
 
 package() {
-	
+	cd $srcdir/$pkgname-$pkgver/scripts
+	install -m755 makepkg.sh $pkgdir/usr/bin/unipkg
 }
