@@ -1,0 +1,189 @@
+diff --git a/scripts/makepkg.sh.in b/scripts/makepkg.sh.in
+index 14479f8..cb6007d 100644
+--- a/scripts/makepkg.sh.in
++++ b/scripts/makepkg.sh.in
+@@ -1114,6 +1114,13 @@ create_package() {
+ 	cd "$pkgdir"
+ 	msg "$(gettext "Creating package...")"
+ 
++	case "$PKGEXT" in
++		*.pkg.*) create_package_pacman ;;
++		*.deb) create_package_debian ;;
++	esac
++}
++
++create_package_pacman() {
+ 	local nameofpkg
+ 	if [[ -z $1 ]]; then
+ 		nameofpkg="$pkgname"
+@@ -1203,6 +1210,130 @@ create_package() {
+ 	fi
+ }
+ 
++create_package_debian() {
++	local nameofpkg
++	if [[ -z $1 ]]; then
++		nameofpkg="$pkgname"
++	else
++		nameofpkg="$1"
++	fi
++
++	local fullver=$(get_full_version $epoch $pkgver $pkgrel)
++	local ret=0
++
++	local pkg_file="data.tar.gz";
++	local control_file="control.tar.gz";
++	local control_files="control";
++
++	local deb_files="$deb_verfile $control_file $pkg_file"
++	local deb_verfile="debian-binary";
++	local deb_filename="$PKGDEST/${nameofpkg}_${pkgver}-${pkgrel}_${PKGARCH}${PKGEXT}"
++	local deb_version="2.0"
++
++	case $PKGARCH in
++		i686) deb_arch=i386 ;;
++		*) deb_arch=$PKGARCH ;;
++	esac
++
++	echo $deb_version > debian-binary
++
++	# when fileglobbing, we want * in an empty directory to expand to
++	# the null string rather than itself
++	shopt -s nullglob
++	# TODO: Maybe this can be set globally for robustness
++	shopt -s -o pipefail
++	bsdtar -cf - * | gzip -c -f -n > $pkg_file  || ret=$?
++	shopt -u nullglob
++	shopt -u -o pipefail
++
++	local builddate=$(date -u "+%s")
++	# we could do some regex matching of the first line to get the maintainer
++	# but that could have some problems, so we just use the packager of the program
++	if [[ -n $PACKAGER ]]; then
++		local packager="$PACKAGER"
++	else
++		local packager="Unknown Packager"
++	fi
++	local size="$(du -sk)"
++	size="$(( ${size%%[^0-9]*} * 1024 ))"
++
++	msg2 "$(gettext "Generating control file...")"
++
++	echo "Package: $nameofpkg" >>$deb_control
++	echo "Version: $pkgver" >>$deb_control
++	echo "Architecture: $deb_arch" >>$deb_control
++	echo "Maintainer: $packager" >>$deb_control
++	echo "Installed-Size: $size" >>$deb_control
++
++	echo -n "Depends: " >>$deb_control
++	n=0
++	for it in "${depends[@]}"; do
++		n=$(echo $n+1 | bc)
++		echo -n "$it" >>control
++		if [ ! $n = "${#depends[@]}" ]
++		then
++			echo -n ", ">>control
++		fi
++	done
++	echo >>control
++
++	echo -n "Conflicts: ">>control
++	n=0
++	for it in "${conflicts[@]}"; do
++		n=$(echo $n+1 | bc)
++		echo -n "$it" >>control
++		if [ ! $n = "${#conflicts[@]}" ]
++		then
++			echo -n ", " >>control
++		fi
++	done
++	echo >>control
++
++	echo -n "Suggests: " >> control
++	for it in "${provides[@]}"; do
++		echo -n "$it" >>control
++		if [ ! $n = "${#provides[@]}" ]
++		then
++			echo -n ", " >>control
++		fi
++	done
++	echo >> control
++
++	echo "Description: $pkgdesc" >>control
++
++	# when fileglobbing, we want * in an empty directory to expand to
++	# the null string rather than itself
++	shopt -s nullglob
++	# TODO: Maybe this can be set globally for robustness
++	shopt -s -o pipefail
++	bsdtar -cf - $control_files | gzip -c -f -n > $control_file  || ret=$?
++	shopt -u nullglob
++	shopt -u -o pipefail
++
++	# ar it up
++	msg2 "$(gettext "Compressing package...")"
++
++	ar rcs $deb_files || ret=$?
++
++	msg2 "$(gettext "Cleaning up files...")"
++
++	rm $deb_files $control_files
++
++	if (( ret )); then
++		error "$(gettext "Failed to create package file.")"
++		exit 1 # TODO: error code
++	fi
++
++	if (( ! ret )) && [[ "$PKGDEST" != "${startdir}" ]]; then
++		ln -sf "${pkg_file}" "${pkg_file/$PKGDEST/$startdir}"
++		ret=$?
++	fi
++
++	if (( ret )); then
++		warning "$(gettext "Failed to create symlink to package file.")"
++	fi
++}
++
+ create_signature() {
+ 	if [[ $SIGNPKG != 'y' ]]; then
+ 		return
+@@ -1702,6 +1833,7 @@ usage() {
+ 	echo "$(gettext "  -m, --nocolor    Disable colorized output messages")"
+ 	echo "$(gettext "  -o, --nobuild    Download and extract files only")"
+ 	printf "$(gettext "  -p <file>        Use an alternate build script (instead of '%s')")\n" "$BUILDSCRIPT"
++	echo "$(gettext "  -P <format>     Specify the format of your package (pacman|debian) defaults to pacman")"
+ 	echo "$(gettext "  -r, --rmdeps     Remove installed dependencies after a successful build")"
+ 	echo "$(gettext "  -R, --repackage  Repackage contents of the package without rebuilding")"
+ 	printf "$(gettext "  -s, --syncdeps   Install missing dependencies with %s")\n" "pacman"
+@@ -1790,6 +1922,7 @@ while true; do
+ 		--nosign)         SIGNPKG='n' ;;
+ 		-o|--nobuild)     NOBUILD=1 ;;
+ 		-p)               shift; BUILDFILE=$1 ;;
++		-P)		          shift; case $1 in; debian) PKGEXT=.deb ;; pacman) PKGEXT=$PKGEXT ;; *) PKGEXT=$1;; ;;
+ 		--pkg)            shift; PKGLIST=($1) ;;
+ 		-r|--rmdeps)      RMDEPS=1 ;;
+ 		-R|--repackage)   REPKG=1 ;;
+@@ -1823,9 +1956,20 @@ MAKEPKG_CONF=${MAKEPKG_CONF:-$confdir/makepkg.conf}
+ if [[ -r $MAKEPKG_CONF ]]; then
+ 	source "$MAKEPKG_CONF"
+ else
+-	error "$(gettext "%s not found.")" "$MAKEPKG_CONF"
+-	plain "$(gettext "Aborting...")"
+-	exit 1 # $E_CONFIG_ERROR
++    if [ -e "/etc/debian_version" ]
++    then
++        warning "$MAKEPKG_CONF not found, trying to set sane defaults"
++        if [ $(type -p fakeroot) ]
++        then
++            BUILDENV=('fakeroot')
++        fi
++        CARCH=`uname -m`
++        eval `dpkg-architecture`
++    else
++        error "$(gettext "%s not found.")" "$MAKEPKG_CONF"
++        plain "$(gettext "Aborting...")"
++        exit 1 # $E_CONFIG_ERROR
++    fi
+ fi
+ 
+ # Source user-specific makepkg.conf overrides, but only if no override config

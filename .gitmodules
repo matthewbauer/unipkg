@@ -1,0 +1,3 @@
+[submodule "pacman"]
+	path = pacman
+	url = git://projects.archlinux.org/pacman.git
