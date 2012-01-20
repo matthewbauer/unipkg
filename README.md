@@ -4,7 +4,8 @@ Create a package for different distros using a single PKGBUILD file
 
 Install
 ========
-Run makepkg :)
+
+Run install.sh 
 
 Usage
 ========

@@ -1,5 +1,12 @@
 #!/bin/bash -e
-#
+#		unipkg  - make package for different distros using a single PKGBUILD file 
+#   Copyright (c) 2012 by Abilng <abilngeorge@gmail.com>
+#		Copyright (c) 2011 by Matthew Bauer <mjbauer95@gmail.com>
+#			
+#		unipkg is  a makepkg fork that can also compile
+#   to other package formats like debian and rpm(eventually).
+#   
+#		 
 #   makepkg - make packages compatible for use with pacman
 #   Generated from makepkg.sh.in; do not edit by hand.
 #
@@ -24,9 +31,9 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-
-# makepkg uses quite a few external programs during its execution. You
-# need to have at least the following installed for makepkg to function:
+#
+#		makepkg uses quite a few external programs during its execution. You
+#		need to have at least the following installed for makepkg to function:
 #   awk, bsdtar (libarchive), bzip2, coreutils, fakeroot, file, find (findutils),
 #   gettext, gpg, grep, gzip, openssl, sed, tput (ncurses), xz
 
