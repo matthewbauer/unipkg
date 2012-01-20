@@ -1,21 +1,29 @@
-# Maintainer:  Matthew Bauer <mjbauer95@gmail.com>
+# Maintainer:  Abilng<abilngeorge@gmail.com>
 pkgname='unipkg'
-pkgver=1
+pkgver=2
 pkgrel=1
-pkgdesc="Unipkg: a makepkg fork that can also compile to other package formats like deb and rpm(eventually). Use it like: unipkg -P deb"
+pkgdesc="Unipkg: a makepkg fork that can also compile to other package formats like deb and rpm(eventually)."
 arch=('any')
-url="http://bauer.dnsdojo.com/Projects/$pkgdir"
+url=""
 license=('GPL')
 source=()
-depends=('bash')
-md5sums=('a730da0cdb302ea30eaf740bc16d0ac7')
+depends=('bash','bc','pacman')
+makedepends=('git')
+md5sums=()
+
+_gitroot="git://github.com/abilng/gnome-baxc-gui.git"
+_gitname="gnome-baxc"
 
 build() {
-	cd $srcdir/$pkgname-$pkgver
-	./configure --prefix=/usr --sysconfdir=/etc \
-		--localstatedir=/var --enable-doc
-	cd scripts
-	make makepkg
+	cd ${srcdir}
+	msg "Connecting to GIT server..."
+	if [[ -d ${_gitname} ]]; then
+		(cd ${_gitname} && git pull origin)
+	else
+		git clone ${_gitroot} ${_gitname}
+	fi
+	msg "GIT checkout done or server timeout"
+
 }
 
 package() {
