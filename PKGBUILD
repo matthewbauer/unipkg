@@ -4,19 +4,19 @@ pkgver=2
 pkgrel=1
 pkgdesc="Unipkg: a makepkg fork that can also compile to other package formats like deb and rpm(eventually)."
 arch=('any')
-url=""
+url="https://github.com/abilng/unipkg"
 license=('GPL')
 source=()
 depends=('bash','bc','pacman')
 makedepends=('git')
 md5sums=()
 
-_gitroot="git://github.com/abilng/gnome-baxc-gui.git"
-_gitname="gnome-baxc"
+_gitroot="git://github.com/abilng/unipkg.git"
+_gitname="unipkg"
 
 build() {
 	cd ${srcdir}
-	msg "Connecting to GIT server..."
+	msg "Connecting to GIT server:${_gitroot}..."
 	if [[ -d ${_gitname} ]]; then
 		(cd ${_gitname} && git pull origin)
 	else
@@ -28,5 +28,5 @@ build() {
 
 package() {
 	cd $srcdir/$pkgname-$pkgver/scripts
-	install -m755 makepkg.sh $pkgdir/usr/bin/unipkg
+	install -m755 ${srcdir}/unipkg/unipkg.sh.in $pkgdir/usr/bin/unipkg
 }
