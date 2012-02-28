@@ -1,13 +1,13 @@
 # Maintainer:  Abilng<abilngeorge@gmail.com>
 pkgname='unipkg'
-pkgver=2
+pkgver=20120228
 pkgrel=1
 pkgdesc="Unipkg: a makepkg fork that can also compile to other package formats like deb and rpm(eventually)."
 arch=('any')
 url="https://github.com/abilng/unipkg"
 license=('GPL')
 source=()
-depends=('bash','bc','pacman')
+depends=("bash" "bc" "pacman")
 makedepends=('git')
 md5sums=()
 
@@ -27,6 +27,6 @@ build() {
 }
 
 package() {
-	cd $srcdir/$pkgname-$pkgver/scripts
-	install -m755 ${srcdir}/unipkg/unipkg.sh.in $pkgdir/usr/bin/unipkg
+	cd $srcdir/
+	install -D -m755 ${srcdir}/unipkg/unipkg.sh.in $pkgdir/usr/bin/unipkg
 }
