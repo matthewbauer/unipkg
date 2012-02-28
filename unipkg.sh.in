@@ -1088,8 +1088,17 @@ find_libprovides() {
 	done
 }
 
+#
+get_packager(){
+	read line < ${BUILDFILE}
+	if [ `expr match "$line" '#Maintainer:'` -ne 0 ];then 
+			PACKAGER=${line#"#Maintainer:"}
+	fi
+}
+
 write_pkginfo() {
 	local builddate=$(date -u "+%s")
+	get_packager
 	if [[ -n $PACKAGER ]]; then
 		local packager="$PACKAGER"
 	else
@@ -1344,8 +1353,7 @@ create_package_debian() {
 	shopt -u -o pipefail
 
 	local builddate=$(date -u "+%s")
-	# we could do some regex matching of the first line to get the maintainer
-	# but that could have some problems, so we just use the packager of the program
+	get_packager
 	if [[ -n $PACKAGER ]]; then
 		local packager="$PACKAGER"
 	else
@@ -1366,7 +1374,14 @@ create_package_debian() {
 	n=0
 	for it in "${depends[@]}"; do
 		n=$(echo $n+1 | bc)
-		echo -n "$it" >>control
+    
+		v=`expr index "$it" "><="` 
+		if [ $v -ne 0 ];then
+					echo -n ${it:0:($v-1)}" ("${it:($v-1)}")" >>control
+		else
+					echo -n ${it} >>control
+		fi
+																												####		echo -n "$it" >>control
 		if [ ! $n = "${#depends[@]}" ]
 		then
 			echo -n ", ">>control
@@ -1378,7 +1393,14 @@ create_package_debian() {
 	n=0
 	for it in "${conflicts[@]}"; do
 		n=$(echo $n+1 | bc)
-		echo -n "$it" >>control
+
+		v=`expr index "$it" "><="` 
+		if [ $v -ne 0 ];then
+					echo -n ${it:0:($v-1)}" ("${it:($v-1)}")" >>control
+		else
+					echo -n ${it} >>control
+		fi
+																											###echo -n "$it" >>control
 		if [ ! $n = "${#conflicts[@]}" ]
 		then
 			echo -n ", " >>control
@@ -1387,8 +1409,15 @@ create_package_debian() {
 	echo >>control
 
 	echo -n "Suggests: " >> control
+	n=0
 	for it in "${provides[@]}"; do
-		echo -n "$it" >>control
+		n=$(echo $n+1 | bc)
+		v=`expr index "$it" "><="` 
+		if [ $v -ne 0 ];then
+					echo -n ${it:0:($v-1)}" ("${it:($v-1)}")" >>control
+		else
+					echo -n ${it} >>control
+		fi																									###echo -n "$it" >>control
 		if [ ! $n = "${#provides[@]}" ]
 		then
 			echo -n ", " >>control
@@ -2132,8 +2161,7 @@ while true; do
 				      pacman) PKGEXT=$PKGEXT ;;
 				      *) PKGEXT=$1;;
 				  esac
-				  echo "test           "
-				      ;;
+				  ;;
 		--pkg)            shift; PKGLIST=($1) ;;
 		-r|--rmdeps)      RMDEPS=1 ;;
 		-R|--repackage)   REPKG=1 ;;
@@ -2284,7 +2312,7 @@ else
 	fi
 fi
 
-unset pkgname pkgbase pkgver pkgrel epoch pkgdesc url license groups provides
+unset pkgname pkgbase pkgver  packager pkgrel epoch  pkgdesc url license groups provides
 unset md5sums replaces depends conflicts backup source install changelog build
 unset makedepends optdepends options noextract
 
