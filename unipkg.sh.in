@@ -1091,8 +1091,8 @@ find_libprovides() {
 #
 get_packager(){
 	read line < ${BUILDFILE}
-	if [ `expr match "$line" '#Maintainer:'` -ne 0 ];then 
-			PACKAGER=${line#"#Maintainer:"}
+	if [ `expr match "$line" '#*Maintainer:'` -ne 0 ];then 
+			PACKAGER=${line#"#*Maintainer:"}
 	fi
 }
 
