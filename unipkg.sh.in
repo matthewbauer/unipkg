@@ -487,8 +487,11 @@ resolve_deps() {
 	for dep in $deplist; do
 		msg2 "$dep"
 	done
-
-	return $R_DEPS_MISSING
+	case "$PKGEXT" in
+		*.pkg.*) return $R_DEPS_MISSING;;
+		*.deb) msg "$(gettext "Debian pkg:Skipping runtime dependency checks.... ")" ;;
+	esac
+	return $R_DEPS_SATISFIED
 }
 
 remove_deps() {
@@ -1091,14 +1094,14 @@ find_libprovides() {
 #
 get_packager(){
 	read line < ${BUILDFILE}
-	if [ `expr match "$line" '#*Maintainer:'` -ne 0 ];then 
-			PACKAGER=${line#"#*Maintainer:"}
+	if [ `expr match "$line" '#Maintainer:'` -ne 0 ];then 
+		PACKAGER=${line#"#Maintainer:"}
 	fi
+#echo $PACKAGER
 }
 
 write_pkginfo() {
 	local builddate=$(date -u "+%s")
-	get_packager
 	if [[ -n $PACKAGER ]]; then
 		local packager="$PACKAGER"
 	else
@@ -1212,7 +1215,7 @@ create_package() {
 	fi
 
 	check_package
-
+	get_packager
 	cd "$pkgdir"
 	msg "$(gettext "Creating package...")"
 
@@ -1372,33 +1375,36 @@ create_package_debian() {
 
 	echo -n "Depends: " >>control
 	n=0
-	for it in "${depends[@]}"; do
+	for it in "${depends[@]}" 
+	do
 		n=$(echo $n+1 | bc)
-    
-		v=`expr index "$it" "><="` 
-		if [ $v -ne 0 ];then
-					echo -n ${it:0:($v-1)}" ("${it:($v-1)}")" >>control
+	  if [ `expr index "$it" "><="` -ne 0 ];
+		then
+			v=`expr index "$it" "><="`
+			echo -n ${it:0:($v-1)}" ("${it:($v-1)}")" >>control
 		else
-					echo -n ${it} >>control
+			echo -n ${it} >>control
 		fi
-																												####		echo -n "$it" >>control
-		if [ ! $n = "${#depends[@]}" ]
+																															####		echo -n "$it" >>control
+		if [ ! $n = "${#depends[@]}" ];
 		then
 			echo -n ", ">>control
 		fi
+		#echo "${#depends[@]}"
 	done
 	echo >>control
-
+	
 	echo -n "Conflicts: ">>control
 	n=0
 	for it in "${conflicts[@]}"; do
 		n=$(echo $n+1 | bc)
 
-		v=`expr index "$it" "><="` 
-		if [ $v -ne 0 ];then
-					echo -n ${it:0:($v-1)}" ("${it:($v-1)}")" >>control
+		if [ `expr index "$it" "><="` -ne 0 ];
+		then
+			v=`expr index "$it" "><="`
+			echo -n ${it:0:($v-1)}" ("${it:($v-1)}")" >>control
 		else
-					echo -n ${it} >>control
+			echo -n ${it} >>control
 		fi
 																											###echo -n "$it" >>control
 		if [ ! $n = "${#conflicts[@]}" ]
@@ -1412,12 +1418,13 @@ create_package_debian() {
 	n=0
 	for it in "${provides[@]}"; do
 		n=$(echo $n+1 | bc)
-		v=`expr index "$it" "><="` 
-		if [ $v -ne 0 ];then
-					echo -n ${it:0:($v-1)}" ("${it:($v-1)}")" >>control
+		if [ `expr index "$it" "><="` -ne 0 ];
+		then
+			v=`expr index "$it" "><="`
+			echo -n ${it:0:($v-1)}" ("${it:($v-1)}")" >>control
 		else
-					echo -n ${it} >>control
-		fi																									###echo -n "$it" >>control
+			echo -n ${it} >>control
+		fi																								###echo -n "$it" >>control
 		if [ ! $n = "${#provides[@]}" ]
 		then
 			echo -n ", " >>control
@@ -2530,7 +2537,6 @@ elif type -p "${PACMAN%% *}" >/dev/null; then
 		original_pkglist=($(run_pacman -Qq))    # required by remove_dep
 	fi
 	deperr=0
-
 	msg "$(gettext "Checking runtime dependencies...")"
 	resolve_deps ${depends[@]} || deperr=1
 
