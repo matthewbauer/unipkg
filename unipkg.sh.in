@@ -54,6 +54,7 @@ other_options=('ccache' 'distcc' 'buildflags' 'makeflags')
 splitpkg_overrides=('pkgver' 'pkgrel' 'pkgdesc' 'arch' 'license' 'groups' \
                     'depends' 'optdepends' 'provides' 'conflicts' 'replaces' \
                     'backup' 'options' 'install' 'changelog')
+deb_subst=('python2' 'python' 'python2-pyserial' 'pyserial')
 readonly -a packaging_options other_options splitpkg_overrides
 
 # Options
@@ -1383,7 +1384,20 @@ create_package_debian() {
 			v=`expr index "$it" "><="`
 			echo -n ${it:0:($v-1)}" ("${it:($v-1)}")" >>control
 		else
-			echo -n ${it} >>control
+			not_found=true
+			for el in $(seq 0 $((${#deb_subst[*]} - 1))); 
+			do
+				if [ ${it} == ${deb_subst[$el]} ]; 
+				then
+					$index = $(($el + 1))
+					echo -n ${deb_subst[$index]} >>control
+					not_found=false
+				fi
+			done
+			if $not_found;
+			then
+				echo -n ${it} >>control
+			fi
 		fi
 																															####		echo -n "$it" >>control
 		if [ ! $n = "${#depends[@]}" ];
