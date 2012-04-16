@@ -1389,7 +1389,7 @@ create_package_debian() {
 			do
 				if [ ${it} == ${deb_subst[$el]} ]; 
 				then
-					$index = $(($el + 1))
+					index=$(($el + 1))
 					echo -n ${deb_subst[$index]} >>control
 					not_found=false
 				fi
