@@ -11,7 +11,7 @@ depends=("bash" "bc" "pacman")
 makedepends=('git')
 md5sums=()
 
-_gitroot="git://github.com/rferrazz/unipkg.git"
+_gitroot="git://github.com/abilng/unipkg.git"
 _gitname="unipkg"
 
 build() {
