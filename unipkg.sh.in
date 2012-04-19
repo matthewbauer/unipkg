@@ -54,6 +54,9 @@ other_options=('ccache' 'distcc' 'buildflags' 'makeflags')
 splitpkg_overrides=('pkgver' 'pkgrel' 'pkgdesc' 'arch' 'license' 'groups' \
                     'depends' 'optdepends' 'provides' 'conflicts' 'replaces' \
                     'backup' 'options' 'install' 'changelog')
+deb_subst=('avahi' 'avahi-daemon'\
+			'python2' 'python'\
+			'python2-pyserial' 'pyserial')
 readonly -a packaging_options other_options splitpkg_overrides
 
 # Options
@@ -1378,12 +1381,38 @@ create_package_debian() {
 	for it in "${depends[@]}" 
 	do
 		n=$(echo $n+1 | bc)
+		not_found=true
 	  if [ `expr index "$it" "><="` -ne 0 ];
 		then
 			v=`expr index "$it" "><="`
-			echo -n ${it:0:($v-1)}" ("${it:($v-1)}")" >>control
+			for el in $(seq 0 $((${#deb_subst[*]} - 1)));
+			do
+				var=${it:0:($v-1)}
+				if [ ${var} == ${deb_subst[$el]} ]; 
+				then
+					index=$(($el + 1))
+					echo -n ${deb_subst[$index]}" ("${it:($v-1)}")" >>control
+					not_found=false
+				fi
+			done
+			if $not_found;
+			then
+				echo -n ${it:0:($v-1)}" ("${it:($v-1)}")" >>control
+			fi
 		else
-			echo -n ${it} >>control
+			for el in $(seq 0 $((${#deb_subst[*]} - 1))); 
+			do
+				if [ ${it} == ${deb_subst[$el]} ]; 
+				then
+					index=$(($el + 1))
+					echo -n ${deb_subst[$index]} >>control
+					not_found=false
+				fi
+			done
+			if $not_found;
+			then
+				echo -n ${it} >>control
+			fi
 		fi
 																															####		echo -n "$it" >>control
 		if [ ! $n = "${#depends[@]}" ];
