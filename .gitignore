@@ -3,3 +3,5 @@ pkg/*
 src/*
 makepkg
 *.tar.xz
+*.deb
+*.rpm
