@@ -1,6 +1,6 @@
 # Maintainer:  Abilng<abilngeorge@gmail.com>
 pkgname='unipkg'
-pkgver=20120228
+pkgver=20120416
 pkgrel=1
 pkgdesc="Unipkg: a makepkg fork that can also compile to other package formats like deb and rpm(eventually)."
 arch=('any')
