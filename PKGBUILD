@@ -1,24 +1,32 @@
-# Maintainer:  Matthew Bauer <mjbauer95@gmail.com>
+# Maintainer:  Abilng<abilngeorge@gmail.com>
 pkgname='unipkg'
-pkgver=1
+pkgver=20130117
 pkgrel=1
-pkgdesc="Unipkg: a makepkg fork that can also compile to other package formats like deb and rpm(eventually). Use it like: unipkg -P deb"
+pkgdesc="Unipkg: a makepkg fork that can also compile to other package formats like deb and rpm(eventually)."
 arch=('any')
-url="http://bauer.dnsdojo.com/Projects/$pkgdir"
+url="https://github.com/abilng/unipkg"
 license=('GPL')
 source=()
-depends=('bash')
-md5sums=('a730da0cdb302ea30eaf740bc16d0ac7')
+depends=("bash" "bc" "pacman")
+makedepends=('git')
+md5sums=()
+
+_gitroot="git://github.com/abilng/unipkg.git"
+_gitname="unipkg"
 
 build() {
-	cd $srcdir/$pkgname-$pkgver
-	./configure --prefix=/usr --sysconfdir=/etc \
-		--localstatedir=/var --enable-doc
-	cd scripts
-	make makepkg
+	cd ${srcdir}
+	msg "Connecting to GIT server:${_gitroot}..."
+	if [[ -d ${_gitname} ]]; then
+		(cd ${_gitname} && git pull origin)
+	else
+		git clone ${_gitroot} ${_gitname}
+	fi
+	msg "GIT checkout done or server timeout"
+
 }
 
 package() {
-	cd $srcdir/$pkgname-$pkgver/scripts
-	install -m755 makepkg.sh $pkgdir/usr/bin/unipkg
+	cd $srcdir/
+	install -D -m755 ${srcdir}/unipkg/unipkg.sh.in $pkgdir/usr/bin/unipkg
 }

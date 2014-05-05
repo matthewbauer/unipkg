@@ -1,3 +1,0 @@
-[submodule "pacman"]
-	path = pacman
-	url = git://github.com/matthewbauer/unipkg-pacman.git

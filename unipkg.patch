@@ -1,0 +1,439 @@
+--- makepkg	2013-01-17 18:04:59.979656855 +0530
++++ unipkg.sh.in	2013-01-17 18:14:20.090289832 +0530
+@@ -1,4 +1,13 @@
+ #!/bin/bash -e
++#   unipkg  - make package for different distros using a single PKGBUILD file 
++#   
++#   Copyright (c) 2012 by Abilng <abilngeorge@gmail.com>
++#   Copyright (c) 2011 by Matthew Bauer <mjbauer95@gmail.com>
++#            
++#   unipkg is  a makepkg fork that can also compile
++#   to other package formats like debian and rpm(eventually).
++#   
++#   ===========================MAKEPKG===========================     
+ #
+ #   makepkg - make packages compatible for use with pacman
+ #   Generated from makepkg.sh.in; do not edit by hand.
+@@ -25,8 +34,8 @@
+ #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ #
+ 
+-# makepkg uses quite a few external programs during its execution. You
+-# need to have at least the following installed for makepkg to function:
++#   makepkg uses quite a few external programs during its execution. You
++#   need to have at least the following installed for makepkg to function:
+ #   awk, bsdtar (libarchive), bzip2, coreutils, fakeroot, file, find (findutils),
+ #   gettext, gpg, grep, gzip, openssl, sed, tput (ncurses), xz
+ 
+@@ -36,6 +45,7 @@
+ 
+ # file -i does not work on Mac OSX unless legacy mode is set
+ export COMMAND_MODE='legacy'
++
+ # Ensure CDPATH doesn't screw with our cd calls
+ unset CDPATH
+ 
+@@ -49,6 +59,9 @@
+ splitpkg_overrides=('pkgver' 'pkgrel' 'epoch' 'pkgdesc' 'arch' 'license' \
+                     'groups' 'depends' 'optdepends' 'provides' 'conflicts' \
+                     'replaces' 'backup' 'options' 'install' 'changelog')
++deb_subst=('avahi' 'avahi-daemon'\
++			'python2' 'python'\
++			'python2-pyserial' 'pyserial')
+ readonly -a packaging_options other_options splitpkg_overrides
+ 
+ # Options
+@@ -131,7 +144,6 @@
+ 	kill "-$signal" "$$"
+ }
+ 
+-
+ ##
+ # Clean up function. Called automatically when the script exits.
+ ##
+@@ -181,6 +193,15 @@
+ }
+ 
+ 
++##
++# Signal Traps
++##
++set -E
++trap 'clean_up' 0
++trap 'trap_exit "$(gettext "TERM signal caught. Exiting...")"' TERM HUP QUIT
++trap 'trap_exit "$(gettext "Aborted by user! Exiting...")"' INT
++trap 'trap_exit "$(gettext "An unknown error has occurred. Exiting...")"' ERR
++
+ enter_fakeroot() {
+ 	msg "$(gettext "Entering %s environment...")" "fakeroot"
+ 
+@@ -444,7 +465,7 @@
+ 	local pmout
+ 	pmout=$(run_pacman -T "$@") || ret=$?
+ 	set -E
+-
++	
+ 	if (( ret == 127 )); then #unresolved deps
+ 		echo "$pmout"
+ 	elif (( ret )); then
+@@ -509,7 +530,14 @@
+ 		msg2 "$dep"
+ 	done
+ 
+-	return $R_DEPS_MISSING
++	#Skipping runtime dependency checks for Debian Pakage.
++	case "$PKGEXT" in
++		*.pkg.*)
++			return $R_DEPS_MISSING;;
++		*.deb)
++			msg "$(gettext "Debian pkg:Skipping runtime dependency checks.... ")"
++			return $R_DEPS_SATISFIED ;;
++	esac
+ }
+ 
+ remove_deps() {
+@@ -1113,6 +1141,14 @@
+ 	done
+ }
+ 
++#
++get_packager(){
++	read line < ${BUILDFILE}
++	if [ `expr match "$line" '#Maintainer:'` -ne 0 ];then 
++		PACKAGER=${line#"#Maintainer:"}
++	fi
++}
++
+ write_pkginfo() {
+ 	local builddate=$(date -u "+%s")
+ 	if [[ -n $PACKAGER ]]; then
+@@ -1125,7 +1161,7 @@
+ 	# to us momentarily and report 0 blocks allocated (which is how du calculates
+ 	# size). Sleeping for a second here is about the dirtiest thing possible,
+ 	# but avoids reporting entirely bogus install sizes.
+-	sleep 1
++	sleep 1	
+ 	local size="$(/usr/bin/du -sk)"
+ 	size="$(( ${size%%[^0-9]*} * 1024 ))"
+ 
+@@ -1228,6 +1264,13 @@
+ }
+ 
+ create_package() {
++	case "$PKGEXT" in
++		*.pkg.*) create_package_pacman ;;
++		*.deb) create_package_debian ;;
++	esac
++}
++
++create_package_pacman() {
+ 	if [[ ! -d $pkgdir ]]; then
+ 		error "$(gettext "Missing %s directory.")" "pkg/"
+ 		plain "$(gettext "Aborting...")"
+@@ -1235,10 +1278,11 @@
+ 	fi
+ 
+ 	check_package
++	get_packager
+ 
+ 	cd "$pkgdir"
+ 	msg "$(gettext "Creating package...")"
+-
++	
+ 	local nameofpkg
+ 	if [[ -z $1 ]]; then
+ 		nameofpkg="$pkgname"
+@@ -1322,6 +1366,198 @@
+ 	fi
+ }
+ 
++create_package_debian() {
++	if [[ ! -d $pkgdir ]]; then
++		error "$(gettext "Missing %s directory.")" "pkg/"
++		plain "$(gettext "Aborting...")"
++		exit 1 # $E_MISSING_PKGDIR
++	fi
++
++	check_package
++	get_packager
++	cd "$pkgdir"
++	msg "$(gettext "Creating package...")"
++
++	local nameofpkg
++	if [[ -z $1 ]]; then
++		nameofpkg="$pkgname"
++	else
++		nameofpkg="$1"
++	fi
++	if [[ $arch = "any" ]]; then
++	    PKGARCH="all"
++	else
++	    PKGARCH=$CARCH
++	fi
++
++	local fullver=$(get_full_version $epoch $pkgver $pkgrel)
++	local ret=0
++
++	local pkg_file="data.tar.gz";
++	local control_file="control.tar.gz";
++	local control_files="control";
++	local deb_verfile="debian-binary";
++	local deb_files="$deb_verfile $control_file $pkg_file"
++	local deb_filename="$PKGDEST/${nameofpkg}_${pkgver}-${pkgrel}_${PKGARCH}${PKGEXT}"
++	local deb_version="2.0"
++
++	case $PKGARCH in
++		i686) deb_arch=i386 ;;
++		*) deb_arch=$PKGARCH ;;
++	esac
++
++	echo $deb_version > debian-binary
++
++	# when fileglobbing, we want * in an empty directory to expand to
++	# the null string rather than itself
++	shopt -s nullglob
++	# TODO: Maybe this can be set globally for robustness
++	shopt -s -o pipefail
++	bsdtar -cf - * | gzip -c -f -n > $pkg_file  || ret=$?
++	shopt -u nullglob
++	shopt -u -o pipefail
++
++	local builddate=$(date -u "+%s")
++	get_packager
++	if [[ -n $PACKAGER ]]; then
++		local packager="$PACKAGER"
++	else
++		local packager="Unknown Packager"
++	fi
++	local size="$(du -sk)"
++	size="$(( ${size%%[^0-9]*} * 1024 ))"
++
++	msg2 "$(gettext "Generating control file...")"
++
++	echo "Package: $nameofpkg" >>control
++	echo "Version: $pkgver" >>control
++	echo "Architecture: $deb_arch" >>control
++	echo "Maintainer: $packager" >>control
++	echo "Installed-Size: $size" >>control
++
++	echo -n "Depends: " >>control
++	n=0
++	for it in "${depends[@]}" 
++	do
++		n=$(echo $n+1 | bc)
++		not_found=true
++	  if [ `expr index "$it" "><="` -ne 0 ];
++		then
++			v=`expr index "$it" "><="`
++			for el in $(seq 0 $((${#deb_subst[*]} - 1)));
++			do
++				var=${it:0:($v-1)}
++				if [ ${var} == ${deb_subst[$el]} ]; 
++				then
++					index=$(($el + 1))
++					echo -n ${deb_subst[$index]}" ("${it:($v-1)}")" >>control
++					not_found=false
++				fi
++			done
++			if $not_found;
++			then
++				echo -n ${it:0:($v-1)}" ("${it:($v-1)}")" >>control
++			fi
++		else
++			for el in $(seq 0 $((${#deb_subst[*]} - 1))); 
++			do
++				if [ ${it} == ${deb_subst[$el]} ]; 
++				then
++					index=$(($el + 1))
++					echo -n ${deb_subst[$index]} >>control
++					not_found=false
++				fi
++			done
++			if $not_found;
++			then
++				echo -n ${it} >>control
++			fi
++		fi
++####		echo -n "$it" >>control
++		if [ ! $n = "${#depends[@]}" ];
++		then
++			echo -n ", ">>control
++		fi
++		#echo "${#depends[@]}"
++	done
++	echo >>control
++	
++	echo -n "Conflicts: ">>control
++	n=0
++	for it in "${conflicts[@]}"; do
++		n=$(echo $n+1 | bc)
++
++		if [ `expr index "$it" "><="` -ne 0 ];
++		then
++			v=`expr index "$it" "><="`
++			echo -n ${it:0:($v-1)}" ("${it:($v-1)}")" >>control
++		else
++			echo -n ${it} >>control
++		fi
++
++		if [ ! $n = "${#conflicts[@]}" ]
++		then
++			echo -n ", " >>control
++		fi
++	done
++	echo >>control
++
++	echo -n "Suggests: " >> control
++	n=0
++	for it in "${provides[@]}"; do
++		n=$(echo $n+1 | bc)
++		if [ `expr index "$it" "><="` -ne 0 ];
++		then
++			v=`expr index "$it" "><="`
++			echo -n ${it:0:($v-1)}" ("${it:($v-1)}")" >>control
++		else
++			echo -n ${it} >>control
++		fi
++		if [ ! $n = "${#provides[@]}" ]
++		then
++			echo -n ", " >>control
++		fi
++	done
++	echo >> control
++
++	echo "Description: $pkgdesc" >>control
++
++	# when fileglobbing, we want * in an empty directory to expand to
++	# the null string rather than itself
++	shopt -s nullglob
++	# TODO: Maybe this can be set globally for robustness
++	shopt -s -o pipefail
++	bsdtar -cf - $control_files | gzip -c -f -n > $control_file  || ret=$?
++	shopt -u nullglob
++	shopt -u -o pipefail
++
++	# ar it up
++	msg2 "$(gettext "Compressing package...")"
++#	echo "ar rcs $deb_files "
++	ar rcs $deb_filename $deb_files ||ret=$?
++
++#	msg2 "$(gettext "Cleaning up files...")"
++#	rm $deb_files $control_files
++
++	if (( ret )); then
++		error "$(gettext "Failed to create package file.")"
++		exit 1 # TODO: error code
++	fi
++	create_signature "$pkg_file"
++	if (( ! ret )) && [[ "$PKGDEST" != "${startdir}" ]]; then
++		ln -sf "${pkg_file}" "${pkg_file/$PKGDEST/$startdir}"
++		ret=$?
++		if [[ -f $pkg_file.sig ]]; then
++		    rm -f "${pkg_file/$PKGDEST/$startdir}.sig"
++		    ln -s "$pkg_file.sig" "${pkg_file/$PKGDEST/$startdir}.sig"
++		fi
++	fi
++
++	if (( ret )); then
++		warning "$(gettext "Failed to create symlink to package file.")"
++	fi
++}
++
+ create_signature() {
+ 	if [[ $SIGNPKG != 'y' ]]; then
+ 		return
+@@ -1498,7 +1734,7 @@
+ 			fi
+ 		fi
+ 	fi
+-
++	
+ 	if (( ${#pkgname[@]} > 1 )); then
+ 		for i in ${pkgname[@]}; do
+ 			local arch_list=""
+@@ -1684,6 +1920,7 @@
+ 	return $ret
+ }
+ 
++
+ devel_check() {
+ 	newpkgver=""
+ 
+@@ -1947,7 +2184,6 @@
+ 	return $ret
+ }
+ 
+-
+ usage() {
+ 	printf "makepkg (pacman) %s\n" "$myver"
+ 	echo
+@@ -1965,6 +2201,7 @@
+ 	printf -- "$(gettext "  -L, --log        Log package build process")\n"
+ 	printf -- "$(gettext "  -m, --nocolor    Disable colorized output messages")\n"
+ 	printf -- "$(gettext "  -o, --nobuild    Download and extract files only")\n"
++	printf -- "$(gettext "  -P <format>      Specify the format of your package (pacman|debian) defaults to pacman")\n"
+ 	printf -- "$(gettext "  -p <file>        Use an alternate build script (instead of '%s')")\n" "$BUILDSCRIPT"
+ 	printf -- "$(gettext "  -r, --rmdeps     Remove installed dependencies after a successful build")\n"
+ 	printf -- "$(gettext "  -R, --repackage  Repackage contents of the package without rebuilding")\n"
+@@ -1993,10 +2230,11 @@
+ 	echo
+ }
+ 
++
+ version() {
+-	printf "makepkg (pacman) %s\n" "$myver"
++	printf -- "makepkg (pacman) %s\n" "$myver"
+ 	printf -- "$(gettext "\
+-Copyright (c) 2006-2012 Pacman Development Team <pacman-dev@archlinux.org>.\n\
++Copyright (c) 2006-2011 Pacman Development Team <pacman-dev@archlinux.org>.\n\
+ Copyright (C) 2002-2006 Judd Vinet <jvinet@zeroflux.org>.\n\n\
+ This is free software; see the source for copying conditions.\n\
+ There is NO WARRANTY, to the extent permitted by law.\n")"
+@@ -2058,7 +2296,13 @@
+ 		--nosign)         SIGNPKG='n' ;;
+ 		-o|--nobuild)     NOBUILD=1 ;;
+ 		-p)               shift; BUILDFILE=$1 ;;
+-		--pkg)            shift; PKGLIST=($1) ;;
++		-P)		  shift;
++		                  case $1 in
++				      debian) PKGEXT=.deb ;;
++				      pacman) PKGEXT=$PKGEXT ;;
++				      *) PKGEXT=$1;;
++				  esac
++				  ;;
+ 		-r|--rmdeps)      RMDEPS=1 ;;
+ 		-R|--repackage)   REPKG=1 ;;
+ 		--skipchecksums)  SKIPCHECKSUMS=1 ;;
+@@ -2102,9 +2346,20 @@
+ if [[ -r $MAKEPKG_CONF ]]; then
+ 	source "$MAKEPKG_CONF"
+ else
+-	error "$(gettext "%s not found.")" "$MAKEPKG_CONF"
+-	plain "$(gettext "Aborting...")"
+-	exit 1 # $E_CONFIG_ERROR
++    if [ -e "/etc/debian_version" ]
++    then
++        warning "$MAKEPKG_CONF not found, trying to set sane defaults"
++        if [ $(type -p fakeroot) ]
++        then
++            BUILDENV=('fakeroot')
++        fi
++        CARCH=`uname -m`
++        eval `dpkg-architecture`
++    else
++        error "$(gettext "%s not found.")" "$MAKEPKG_CONF"
++        plain "$(gettext "Aborting...")"
++        exit 1 # $E_CONFIG_ERROR
++    fi
+ fi
+ 
+ # Source user-specific makepkg.conf overrides, but only if no override config
+@@ -2409,7 +2664,7 @@
+ 	fi
+ 	check_source_integrity
+ 	cd "$startdir"
+-
++	
+ 	# if we are root or if fakeroot is not enabled, then we don't use it
+ 	if [[ $(check_buildenv fakeroot) != "y" ]] || (( EUID == 0 )); then
+ 		create_srcpackage

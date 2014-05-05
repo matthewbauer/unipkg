@@ -1,4 +1,7 @@
-pkg
-src
-*.src.*
-*.pkg.*
+*~
+pkg/*
+src/*
+makepkg
+*.tar.xz
+*.deb
+*.rpm
