@@ -2252,7 +2252,7 @@ fi
 ARGLIST=("$@")
 
 # Parse Command Line Options.
-OPT_SHORT="AcdefFghiLmop:rRsSV"
+OPT_SHORT="AcdefFghiLmopP:rRsSV"
 OPT_LONG="allsource,asroot,ignorearch,check,clean,nodeps"
 OPT_LONG+=",noextract,force,forcever:,geninteg,help,holdver,skippgpcheck"
 OPT_LONG+=",install,key:,log,nocolor,nobuild,nocheck,nosign,pkg:,rmdeps"
